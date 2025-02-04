@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Task Distribution System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .task { transition: all 0.3s ease; }
+        .agent { transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">AI Task Distribution System</h1>
+        
+        <!-- Task Creation -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Create New Task</h2>
+            <form id="taskForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Task Title</label>
+                    <input type="text" id="taskTitle" class="w-full p-2 border rounded" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Description</label>
+                    <textarea id="taskDescription" class="w-full p-2 border rounded" rows="3" required></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Priority (1-5)</label>
+                    <input type="number" id="taskPriority" min="1" max="5" value="3" class="w-full p-2 border rounded">
+                </div>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Create Task</button>
+            </form>
+        </div>
+
+        <!-- Task List -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Active Tasks</h2>
+                <div id="taskList" class="space-y-4"></div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">AI Agents</h2>
+                <div id="agentList" class="space-y-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class TaskManager {
+            constructor() {
+                this.tasks = [];
+                this.agents = [
+                    { id: 1, name: 'Research Agent', type: 'research', status: 'available', successRate: 98 },
+                    { id: 2, name: 'Writing Agent', type: 'writing', status: 'available', successRate: 95 },
+                    { id: 3, name: 'Code Agent', type: 'coding', status: 'available', successRate: 97 },
+                    { id: 4, name: 'Analysis Agent', type: 'analysis', status: 'available', successRate: 96 }
+                ];
+            }
+
+            createTask(title, description, priority) {
+                const task = {
+                    id: Date.now(),
+                    title,
+                    description,
+                    priority,
+                    status: 'analyzing',
+                    progress: 0,
+                    subtasks: []
+                };
+
+                // Analyze and break down task
+                this.analyzeTask(task);
+                this.tasks.push(task);
+                this.updateUI();
+                return task;
+            }
+
+            analyzeTask(task) {
+                const keywords = {
+                    research: ['research', 'find', 'investigate', 'analyze'],
+                    writing: ['write', 'create', 'compose', 'draft'],
+                    coding: ['code', 'program', 'develop', 'implement'],
+                    analysis: ['analyze', 'evaluate', 'assess', 'review']
+                };
+
+                const subtasks = [];
+                const description = task.description.toLowerCase();
+
+                // Generate subtasks based on keywords
+                for (const [type, words] of Object.entries(keywords)) {
+                    if (words.some(word => description.includes(word))) {
+                        subtasks.push({
+                            type,
+                            status: 'pending',
+                            progress: 0,
+                            agent: null
+                        });
+                    }
+                }
+
+                // Always add analysis subtask if none found
+                if (subtasks.length === 0) {
+                    subtasks.push({
+                        type: 'analysis',
+                        status: 'pending',
+                        progress: 0,
+                        agent: null
+                    });
+                }
+
+                task.subtasks = subtasks;
+                this.assignAgents(task);
+            }
+
+            assignAgents(task) {
+                task.subtasks.forEach(subtask => {
+                    const availableAgent = this.agents.find(agent => 
+                        agent.type === subtask.type && agent.status === 'available'
+                    );
+
+                    if (availableAgent) {
+                        subtask.agent = availableAgent.id;
+                        availableAgent.status = 'busy';
+                        
+                        // Simulate agent work
+                        this.simulateWork(task, subtask, availableAgent);
+                    }
+                });
+            }
+
+            simulateWork(task, subtask, agent) {
+                const duration = 3000 + Math.random() * 5000; // 3-8 seconds
+                const interval = setInterval(() => {
+                    subtask.progress += 10;
+                    task.progress = this.calculateTaskProgress(task);
+                    this.updateUI();
+
+                    if (subtask.progress >= 100) {
+                        clearInterval(interval);
+                        subtask.status = 'completed';
+                        agent.status = 'available';
+                        
+                        // Check if all subtasks are completed
+                        if (task.subtasks.every(st => st.status === 'completed')) {
+                            task.status = 'completed';
+                        }
+                        this.updateUI();
+                    }
+                }, duration / 10);
+            }
+
+            calculateTaskProgress(task) {
+                const totalProgress = task.subtasks.reduce((sum, subtask) => sum + subtask.progress, 0);
+                return Math.round(totalProgress / task.subtasks.length);
+            }
+
+            updateUI() {
+                // Update Tasks
+                const taskList = document.getElementById('taskList');
+                taskList.innerHTML = this.tasks.map(task => `
+                    <div class="task border rounded p-4 ${task.status === 'completed' ? 'bg-green-50' : 'bg-gray-50'}">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-semibold">${task.title}</h3>
+                            <span class="text-sm ${task.status === 'completed' ? 'text-green-600' : 'text-blue-600'}">${task.status}</span>
+                        </div>
+                        <div class="mb-2">
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${task.progress}%"></div>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-600 mb-2">${task.description}</p>
+                        <div class="space-y-2">
+                            ${task.subtasks.map(subtask => `
+                                <div class="text-sm">
+                                    <span class="font-medium">${subtask.type}:</span>
+                                    <span class="text-gray-600">${subtask.progress}%</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+
+                // Update Agents
+                const agentList = document.getElementById('agentList');
+                agentList.innerHTML = this.agents.map(agent => `
+                    <div class="agent border rounded p-4 ${agent.status === 'available' ? 'bg-green-50' : 'bg-yellow-50'}">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-semibold">${agent.name}</h3>
+                            <span class="text-sm ${agent.status === 'available' ? 'text-green-600' : 'text-yellow-600'}">${agent.status}</span>
+                        </div>
+                        <p class="text-sm text-gray-600">Success Rate: ${agent.successRate}%</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Initialize Task Manager
+        const taskManager = new TaskManager();
+
+        // Handle form submission
+        document.getElementById('taskForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const title = document.getElementById('taskTitle').value;
+            const description = document.getElementById('taskDescription').value;
+            const priority = parseInt(document.getElementById('taskPriority').value);
+            
+            taskManager.createTask(title, description, priority);
+            
+            // Reset form
+            e.target.reset();
+        });
+
+        // Initial UI update
+        taskManager.updateUI();
+    </script>
+</body>
+</html>
